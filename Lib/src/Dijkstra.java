@@ -5,13 +5,18 @@ public class Dijkstra {
 	FastScanner in;
 	PrintWriter out;
 
-	class Edge {
+	class Edge implements Comparable<Edge>{
 		int to, cost;
 
 		public Edge(int to, int cost) {
 			super();
 			this.to = to;
 			this.cost = cost;
+		}
+
+		@Override
+		public int compareTo(Edge o) {
+			return Integer.compare(cost, o.cost);
 		}
 
 	}

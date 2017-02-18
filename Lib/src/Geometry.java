@@ -76,6 +76,11 @@ public class Geometry {
 		return res;
 	}
 
+//	// polygon should be ccw
+//	int[] findTangentsToConvexPolygon(Point p, Point[] polygon) {
+//		
+//	}
+	
 	void solve() {
 		int n = in.nextInt();
 		Point[] a = new Point[n];
