@@ -6,15 +6,15 @@ public class Test {
 	PrintWriter out;
 
 	void solve() {
-		System.err.println(33803 & 1024);
-		while (in.hasMoreTokens()) {
-			String s = in.next();
-			try {
-				int val  = Integer.parseInt(s);
-				System.err.print("array("+val+"),");
-			}catch (NumberFormatException e) {
-				
-			}
+		int[] vals = new int[4000];
+		Random rnd = new Random(123);
+		for (int i =0 ; i < 6949543; i++) {
+			vals[rnd.nextInt(vals.length)]++;
+		}
+		Arrays.sort(vals);
+		for (int i = 0; i <= 50; i++) {
+			int id = i * vals.length / 50;
+			System.err.println(vals[id]);
 		}
 	}
 
@@ -101,6 +101,6 @@ public class Test {
 	}
 
 	public static void main(String[] args) {
-		new Test().run();
+		new Test().runIO();
 	}
 }
