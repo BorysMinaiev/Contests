@@ -1,6 +1,7 @@
 package SocketGame;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
@@ -9,7 +10,7 @@ import java.net.Socket;
 import java.net.UnknownHostException;
 
 public class Connections {
-	static PrintWriter out;
+	static PrintWriter out, roundInfo;
 	static BufferedReader in, stdIn;
 
 	public static class Event {
@@ -26,22 +27,26 @@ public class Connections {
 
 	}
 
-	static void expectOK() {
-		expect("OK");
+	static boolean expectOK() {
+		return expect("OK");
 	}
 
-	static void expect(String s) {
+	static boolean expect(String s) {
 		try {
 			String got = in.readLine();
 			if (got.equals(s)) {
-				return;
+				return true;
 			}
+			roundInfo.println("expected OK, found " + got);
+			roundInfo.flush();
 			System.err.println("EXPECT OK, FOUND: " + got);
+			return false;
 			// throw new AssertionError();
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+		return false;
 	}
 
 	static MyTokenizer tokenizer;
@@ -87,7 +92,10 @@ public class Connections {
 	}
 
 	static void sendToServer(String line) {
+		Strategy.commandsSend++;
 		System.err.println("send to net: " + line);
+		roundInfo.println("Send: " + System.currentTimeMillis() + ": " + line);
+		roundInfo.flush();
 		out.println(line);
 	}
 
@@ -98,19 +106,22 @@ public class Connections {
 			try {
 				Socket socket = new Socket(Constants.HOSTNAME, Constants.PORT);
 				out = new PrintWriter(socket.getOutputStream(), true);
+				roundInfo = new PrintWriter(new File("roundinfo.txt"));
 				in = new BufferedReader(new InputStreamReader(
 						socket.getInputStream()));
 				stdIn = new BufferedReader(new InputStreamReader(System.in));
 				System.err.println("???");
 				break;
-			} catch (ConnectException e) {
-				System.err.println(" :(");
+			} catch (Exception e) {
+				System.err.println(" :( " + e.getMessage());
+
 				try {
 					Thread.sleep(1000);
 				} catch (InterruptedException e1) {
 					// TODO Auto-generated catch block
 					e1.printStackTrace();
 				}
+				// break;
 			}
 		}
 	}

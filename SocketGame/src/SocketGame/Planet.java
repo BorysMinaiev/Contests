@@ -25,6 +25,17 @@ class Planet {
 		return true;
 	}
 
+	int getInterestingSize() {
+		int res = 0;
+		for (int packetId : packetsHere) {
+			if (!Strategy.packetsHave.contains(packetId)
+					&& !Strategy.packetsOnWay.contains(packetId)) {
+				res++;
+			}
+		}
+		return res;
+	}
+	
 	boolean isInteresting() {
 		for (int packetId : packetsHere) {
 			if (!Strategy.packetsHave.contains(packetId)

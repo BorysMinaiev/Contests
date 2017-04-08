@@ -1,6 +1,8 @@
 package SocketGame;
 
 import java.awt.*;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionListener;
@@ -19,7 +21,6 @@ import javax.swing.JPanel;
 
 import static SocketGame.Connections.*;
 
-@SuppressWarnings("serial")
 public class Main extends JFrame {
 
 	void printLogin() {
@@ -46,18 +47,7 @@ public class Main extends JFrame {
 
 	}
 
-	void turnsLeft() {
-		sendToServer("TURNS_LEFT");
-		expect("OK");
-		turnsLeft = nextInt();
-		int a = nextInt();
-		int b = nextInt();
-		// System.err.println(tot + " " + a + " " + b);
-
-	}
-
 	void mainCycle() {
-		turnsLeft();
 		Strategy.move();
 		myCanvas.repaint();
 	}
@@ -85,15 +75,20 @@ public class Main extends JFrame {
 						// Connections.sendToServer(e.line);
 					}
 				} else {
-					needMainCycle = true;
 					if (e.line.equals("OK")) {
+						needMainCycle = true;
+						roundInfo.println("NEW MOVE");
+						roundInfo.flush();
 						continue;
 					}
+					roundInfo.println("WTF??? " + e.line);
+					roundInfo.flush();
 					System.err.println("WTF? Got something strange: " + e.line);
 				}
 			} catch (Exception e) {
 				System.err.println("some exception : " + e.getMessage() + ", "
 						+ Arrays.toString(e.getStackTrace()));
+				System.err.println(e.getLocalizedMessage());
 			}
 		}
 	}
@@ -113,6 +108,50 @@ public class Main extends JFrame {
 		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		setVisible(true);
 		setAlwaysOnTop(true);
+
+		addKeyListener(new KeyListener() {
+
+			@Override
+			public void keyTyped(KeyEvent e) {
+				// TODO Auto-generated method stub
+
+			}
+
+			@Override
+			public void keyReleased(KeyEvent e) {
+				// TODO Auto-generated method stub
+
+			}
+
+			@Override
+			public void keyPressed(KeyEvent e) {
+				switch (e.getKeyCode()) {
+				case 37:
+					centerY -= SCREEN_STEP;
+					break;
+				case 39:
+					centerY += SCREEN_STEP;
+					break;
+				case 38:
+					centerX -= SCREEN_STEP;
+					break;
+				case 40:
+					centerX += SCREEN_STEP;
+					break;
+				case 93:
+					screenSize *= 0.9;
+					break;
+				case 91:
+					screenSize *= 1.1;
+					break;
+				default:
+					break;
+				}
+				myCanvas.repaint();
+				// System.err.println("code = " + e.getKeyCode());
+
+			}
+		});
 
 		myCanvas.addMouseListener(new MouseListener() {
 			@Override
@@ -212,6 +251,9 @@ public class Main extends JFrame {
 	}
 
 	int minX, maxX, minY, maxY;
+	int centerX = 0, centerY = 0;
+	int screenSize = 1000;
+	int SCREEN_STEP = 10;
 
 	Point motherDest = new Point(0, 0);
 
@@ -227,8 +269,6 @@ public class Main extends JFrame {
 	Point getPointFromRealCoord(int x, int y) {
 		return new Point(x / coef + minX, y / coef + minY);
 	}
-
-	int turnsLeft;
 
 	class MyCanvas extends JPanel {
 		public void paint(Graphics graphics) {
@@ -249,6 +289,12 @@ public class Main extends JFrame {
 			for (Satelite s : Strategy.satelites) {
 				updateScreenSize(s.x, s.y);
 			}
+
+			minX = centerX - screenSize;
+			maxX = centerX + screenSize;
+			minY = centerY - screenSize;
+			maxY = centerY + screenSize;
+
 			coef = Math.min(height * 1. / (maxX - minX), width * 1.
 					/ (maxY - minY));
 			for (Planet p : Strategy.allPlanets) {
@@ -267,18 +313,25 @@ public class Main extends JFrame {
 
 			for (Satelite s : Strategy.satelites) {
 				Point p = convertPoint(s.x, s.y);
-				// System.err.println("(" + s.x + ", " + s.y + ") -> (" + p.x
-				// + ", " + p.y + ")");
-				drawText(graphics, s.id + "", p.y, p.x, false);
+				drawText(graphics, s.id + "(" + s.memoryUsed() + "/" + s.memory
+						+ ")", p.y, p.x, false);
+			}
+			for (Planet planet : Strategy.allPlanets) {
+				Point p = convertPoint(planet.x, planet.y);
+				if (planet.getInterestingSize() > 0)
+					drawText(graphics, planet.getInterestingSize() + "",
+							p.y + 10, p.x + 10, false);
 			}
 
 			Point mouse = getPointFromRealCoord(mouseX, mouseY);
 			drawText(graphics,
 					"money = " + Strategy.money + ", pts = " + Strategy.points
-							+ ", have packets = " + Strategy.packetsHave.size()
-							+ "/" + Strategy.allPacketsIds.size()
+							+ ", packets = " + Strategy.packetsHave.size()
+							+ "/" + Strategy.allPacketsIds.size() + ", tasks "
+							+ Strategy.tasksDone + "/" + Strategy.tasksTotal
 							+ ", satellites = " + Strategy.satelites.size()
-							+ ", turns left = " + turnsLeft, 100, 100, false);
+							+ ", turns left = " + Strategy.turnsLeft + "\n satellite cost = " + Strategy.sateliteCost, 100, 100,
+					false);
 		}
 	}
 }

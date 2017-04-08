@@ -44,4 +44,22 @@ class Satelite implements Comparable<Satelite> {
 		return false;
 	}
 
+	boolean needToMother() {
+		for (int packet : packets) {
+			if (packet >= 0 && !Strategy.packetsHave.contains(packet)) {
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	int memoryUsed() {
+		int res = 0;
+		for (int packet : packets) {
+			if (packet >= 0 && !Strategy.packetsHave.contains(packet)) {
+				res++;
+			}
+		}
+		return res;
+	}
 }

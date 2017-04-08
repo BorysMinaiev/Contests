@@ -1,11 +1,13 @@
 package SocketGame;
 
+import static SocketGame.Connections.expect;
 import static SocketGame.Connections.expectOK;
 import static SocketGame.Connections.nextDouble;
 import static SocketGame.Connections.nextInt;
 import static SocketGame.Connections.sendToServer;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 
@@ -23,10 +25,16 @@ public class Strategy {
 	static int points, money;
 	static int sateliteCost;
 	static int motherSpeed;
+	static ArrayList<Point> others = new ArrayList<>();
+	static int scanerTime;
+	static int turnsLeft;
+	static int commandsSend;
 
 	static void getPlanets() {
 		sendToServer("GET_PLANETS");
-		expectOK();
+		if (!expectOK()) {
+			return;
+		}
 		int n = nextInt();
 		System.err.println("planets " + n);
 		allPlanets.clear();
@@ -36,8 +44,6 @@ public class Strategy {
 			int y = nextInt();
 			int prom = nextInt();
 			Planet planet = new Planet(id, x, y, prom);
-			// System.err.println("r = " + prom);
-			// System.err.println(id + " " + x + " " + y + " " + prom);
 			allPlanets.add(planet);
 			planets.put(id, planet);
 		}
@@ -45,10 +51,11 @@ public class Strategy {
 
 	static void getMother() {
 		sendToServer("GET_MOTHERSHIP");
-		expectOK();
+		if (!expectOK()) {
+			return;
+		}
 		int x = nextInt();
 		int y = nextInt();
-		// System.err.println("!!! " + x + " " +y);
 		mother.x = x;
 		mother.y = y;
 	}
@@ -74,45 +81,65 @@ public class Strategy {
 		y /= satelites.size();
 		Point next = getMovePoint(mother.x, mother.y, x, y, motherSpeed);
 		sendToServer("MOVE_MOTHERSHIP " + next.x + " " + next.y);
-		expectOK();
+		if (!expectOK()) {
+			return;
+		}
 	}
 
 	static void moveSatellite(Satelite s, int x, int y) {
 		Point next = getMovePoint(s.x, s.y, x, y, s.speed);
 		sendToServer("MOVE_SATELLITE " + (s.id) + " " + next.x + " " + next.y);
-		expectOK();
+		if (!expectOK()) {
+			return;
+		}
 	}
 
 	static void getConstants() {
 		sendToServer("GET_CONSTANTS");
-		expectOK();
+		if (!expectOK()) {
+			return;
+		}
 		sateliteCost = nextInt();
 		motherSpeed = nextInt();
 		nextInt();
-		nextInt();
+		scanerTime = nextInt();
 		nextInt();
 		System.err.println("??? " + sateliteCost + "  " + motherSpeed);
 	}
 
 	static void getPoints() {
 		sendToServer("GET_POINTS");
-		expectOK();
+		if (!expectOK()) {
+			return;
+		}
 		points = nextInt();
 		money = nextInt();
 		System.err.println("points: " + points + ", " + money);
 	}
 
+	public static int tasksTotal, tasksDone;
+
+	static HashMap<Integer, Integer> tasksCost = new HashMap<>();
+
 	static void getTasks() {
+		sendToServer("GET_TASKS");
+		if (!expectOK()) {
+			return;
+		}
+		tasksCost.clear();
+		Connections.roundInfo.println("GET TASKS:");
 		packetsHave.clear();
 		allPacketsIds.clear();
-		sendToServer("GET_TASKS");
-		expectOK();
 		int n = nextInt();
+		tasksTotal = n;
+		tasksDone = 0;
 		System.err.println(n + " tasks we have!");
 		for (int i = 0; i < n; i++) {
 			int k = nextInt();
 			int perPacketCost = nextInt();
 			int perTaskCost = nextInt();
+			Connections.roundInfo.print("packet cost = " + perPacketCost
+					+ ", task = " + perTaskCost);
 			// System.err.println(k + " packets " + perPacketCost + ", "
 			// + perTaskCost);
 			int[] ids = new int[k];
@@ -126,25 +153,61 @@ public class Strategy {
 				// System.err.print(packetId + " " + planetId + " ");
 			}
 			// System.err.println();
+			int sum = 0;
+			boolean[] done = new boolean[k];
 			for (int j = 0; j < k; j++) {
-				if (nextInt() == 1) {
+				done[j] = nextInt() == 1;
+				if (done[j]) {
 					packetsHave.add(ids[j]);
+					sum++;
 				}
 			}
+			if (sum == k) {
+				tasksDone++;
+			}
+			for (int j = 0; j < k; j++) {
+				if (!done[j]) {
+					int addCost = perPacketCost +  perTaskCost / (k - sum);
+					Integer now = tasksCost.get(ids[j]);
+					tasksCost.put(ids[j], addCost + (now == null ? 0 : now));
+//					Connections.roundInfo.println("TASK COST " + ids[j] + " " + tasksCost.get(ids[j]));
+				}
+			}
+			Connections.roundInfo.println(" : " + sum + "/" + k);
+			System.err.println("task done: " + (sum) + "/" + k);
 			// System.err.println();
 		}
+		Connections.roundInfo.flush();
 	}
 
 	static void buySatelites() {
 		if (money >= sateliteCost) {
 			sendToServer("BUY_SATELLITE");
-			expectOK();
+			if (!expectOK()) {
+				return;
+			}
 		}
+	}
+
+	static void turnsLeft() {
+		sendToServer("TURNS_LEFT");
+		expect("OK");
+		turnsLeft = nextInt();
+		int a = nextInt();
+		int b = nextInt();
+		// System.err.println(tot + " " + a + " " + b);
+
+	}
+
+	static void scan() {
+		turnsLeft();
 	}
 
 	static void getSatelites() {
 		sendToServer("GET_SATELLITES");
-		expectOK();
+		if (!expectOK()) {
+			return;
+		}
 		satelites.clear();
 		int n = nextInt();
 		for (int i = 0; i < n; i++) {
@@ -172,21 +235,52 @@ public class Strategy {
 		return false;
 	}
 
+	static double getPlanetScore(Planet p, Satelite s) {
+		ArrayList<Integer> costs = new ArrayList<>();
+		for (int packetId : p.packetsHere) {
+			Integer c = tasksCost.get(packetId);
+			if (c != null) {
+				costs.add(c);
+			}
+		}
+		Collections.sort(costs);
+		double totalCost = 0;
+		for (int i = 0; i < costs.size() && i < s.memory; i++) {
+			totalCost += costs.get(costs.size() - i - 1);
+		}
+		double dist = 2
+				* Math.floor(Math.sqrt(dist(p.x, p.y, s.x, s.y)) / s.speed + 1)
+				+ Math.min(costs.size(), s.memory);
+		totalCost /= dist;
+		return totalCost;
+	}
+
 	static void moveSatelites() {
+		if (commandsSend > 90) {
+			return;
+		}
 		for (Satelite s : satelites) {
 			Point dest = destinations.get(s.id);
 			if (dest != null) {
 				for (Planet p : allPlanets) {
-					if (!p.isInteresting()) {
-						continue;
-					}
 					if (dist(p.x, p.y, dest.x, dest.y) == 0) {
-						if (s.hasMemory()) {
+						if (s.hasMemory() && p.isInteresting()) {
 							p.used = true;
 						} else {
 							destinations.remove(s.id);
+							break;
 						}
 					}
+				}
+			}
+		}
+
+		for (Satelite s : satelites) {
+			Point dest = destinations.get(s.id);
+			if (dest != null) {
+				boolean moveToMother = dist(dest.x, dest.y, mother.x, mother.y) <= 50;
+				if (moveToMother && !s.needToMother()) {
+					destinations.remove(s.id);
 				}
 			}
 		}
@@ -205,12 +299,12 @@ public class Strategy {
 		for (Satelite s : satelites) {
 			Point dest = destinations.get(s.id);
 			if (dest == null) {
-				int bestDist = Integer.MAX_VALUE;
+				double bestDist = 0;
 				Planet bestP = null;
 				for (Planet p : allPlanets) {
 					if (okPlanet(p)) {
-						int dist = dist(p.x, p.y, s.x, s.y);
-						if (dist < bestDist) {
+						double dist = getPlanetScore(p, s);
+						if (dist > bestDist) {
 							bestDist = dist;
 							bestP = p;
 						}
@@ -228,7 +322,9 @@ public class Strategy {
 
 	static void getPackets(int satId) {
 		sendToServer("GET_TRANSMISSIONS " + satId);
-		expectOK();
+		if (!expectOK()) {
+			return;
+		}
 		int n = nextInt();
 		for (int i = 0; i < n; i++) {
 			int packetId = nextInt();
@@ -253,7 +349,9 @@ public class Strategy {
 				sendToServer("RECEIVE_PACKET " + s.id + " " + packetId + " "
 						+ i);
 				s.packets[i] = -2;
-				expectOK();
+				if (!expectOK()) {
+					return false;
+				}
 				return true;
 			}
 			if (s.packets[i] == -2) {
@@ -263,8 +361,26 @@ public class Strategy {
 		return false;
 	}
 
+	static class Get implements Comparable<Get> {
+		int packetId;
+		double cost;
+
+		public Get(int packetId, double cost) {
+			super();
+			this.packetId = packetId;
+			this.cost = cost;
+		}
+
+		@Override
+		public int compareTo(Get o) {
+			return Double.compare(o.cost, cost);
+		}
+
+	}
+
 	static void getPacketsFromPlanets() {
 		for (Satelite s : satelites) {
+			ArrayList<Get> all = new ArrayList<>();
 			for (Planet p : allPlanets) {
 				if (dist(s.x, s.y, p.x, p.y) <= p.prom * p.prom) {
 					for (int packetId : p.packetsHere) {
@@ -274,12 +390,17 @@ public class Strategy {
 						if (packetsHave.contains(packetId)) {
 							continue;
 						}
-						if (savePacket(s, packetId)) {
-							packetsOnWay.add(packetId);
-							System.err.println("total siz = "
-									+ packetsOnWay.size());
+						Integer co = tasksCost.get(packetId);
+						if (co != null) {
+							all.add(new Get(packetId, co));
 						}
 					}
+				}
+			}
+			Collections.sort(all);
+			if (all.size() != 0) {
+				if (savePacket(s, all.get(0).packetId)) {
+					packetsOnWay.add(all.get(0).packetId);
 				}
 			}
 		}
@@ -287,48 +408,101 @@ public class Strategy {
 
 	static void getPacketsMain() {
 		for (int id : packetsSubmitedOnPrevTurn) {
+			if (packetsHave.contains(id)) {
+				continue;
+			}
 			sendToServer("DELIVER_PACKET " + id);
-			expectOK();
+			if (!expectOK()) {
+				return;
+			}
 		}
 	}
 
 	static void sendPacketsToMain() {
 		packetsSubmitedOnPrevTurn.clear();
 		for (Satelite s : satelites) {
-			if (dist(s.x, s.y, mother.x, mother.y) <= 100) {
-				{
-					System.err.println("send to main!");
-					for (int i = 0; i < s.packets.length; i++) {
-						if (s.packets[i] >= 0
-								&& !packetsHave.contains(s.packets[i])) {
-							System.err.println(" ID = " + s.packets[i]);
-							sendToServer("TRANSMIT_PACKET " + s.id + " "
-									+ s.packets[i] + " " + s.maxSygnal);
-							expectOK();
-							packetsSubmitedOnPrevTurn.add(s.packets[i]);
-							break;
+			if (dist(s.x, s.y, mother.x, mother.y) <= 200) {
+				for (int i = 0; i < s.packets.length; i++) {
+					if (s.packets[i] >= 0
+							&& !packetsHave.contains(s.packets[i])) {
+						sendToServer("TRANSMIT_PACKET " + s.id + " "
+								+ s.packets[i] + " " + s.maxSygnal);
+						if (!expectOK()) {
+							return;
 						}
+						packetsSubmitedOnPrevTurn.add(s.packets[i]);
+						break;
 					}
 				}
+
 			}
 		}
 	}
 
+	static int updateMemoryCost = -1;
+
+	static void getUpdates() {
+		sendToServer("GET_UPGRADES");
+		expectOK();
+		int n = 4;
+		for (int i = 0; i < n; i++) {
+			String s = Connections.nextToken();
+			Connections.roundInfo.print(s + " ");
+			int k = nextInt();
+			for (int j = 0; j < k + 1; j++) {
+				double value = nextDouble();
+				Connections.roundInfo.print(value + " ");
+			}
+			for (int j = 0; j < k; j++) {
+				int cost = nextInt();
+				if (i == 1 && j == 1) {
+					updateMemoryCost = cost;
+				}
+				Connections.roundInfo.print(cost + " ");
+			}
+			Connections.roundInfo.println();
+		}
+		Connections.roundInfo.flush();
+	}
+
+	public static void updateSatelites() {
+		for (Satelite s : satelites) {
+			if (s.lvlPam == 0 && money >= updateMemoryCost) {
+				money -= updateMemoryCost;
+				sendToServer("UPGRADE_SATELLITE " + s.id + " memory " + 1);
+				expectOK();
+			}
+			// Connections.roundInfo.println("LVL = " + s.lvlPam);
+		}
+	}
+
+	static long last = 0;
+
 	public static void move() {
+		long cur = System.currentTimeMillis();
+		if (cur - last < 100) {
+			return;
+		}
+		last = cur;
+		commandsSend = 0;
 		getPlanets();
 		getMother();
 		getConstants();
+		getUpdates();
+		scan();
 		getTasks();
 		getPoints();
 		getSatelites();
+		updateSatelites();
 		getPacketsMain();
 		sendPacketsToMain();
-		for (Satelite s : satelites) {
-			getPackets(s.id);
-		}
+		// for (Satelite s : satelites) {
+		// getPackets(s.id);
+		// }
 		getPacketsFromPlanets();
 		buySatelites();
 		moveSatelites();
 		moveMother();
+		Connections.roundInfo.println("sent commands: " + commandsSend);
 	}
 }
