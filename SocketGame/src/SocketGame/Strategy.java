@@ -167,10 +167,12 @@ public class Strategy {
 			}
 			for (int j = 0; j < k; j++) {
 				if (!done[j]) {
-					int addCost = perPacketCost +  perTaskCost / (k - sum);
+					int addCost = perPacketCost;
+					if (satelites.size() > 10) addCost += 5 * perTaskCost / (k - sum) ;
 					Integer now = tasksCost.get(ids[j]);
 					tasksCost.put(ids[j], addCost + (now == null ? 0 : now));
-//					Connections.roundInfo.println("TASK COST " + ids[j] + " " + tasksCost.get(ids[j]));
+					// Connections.roundInfo.println("TASK COST " + ids[j] + " "
+					// + tasksCost.get(ids[j]));
 				}
 			}
 			Connections.roundInfo.println(" : " + sum + "/" + k);
@@ -199,8 +201,23 @@ public class Strategy {
 
 	}
 
+	static void getOthers() {
+		if (turnsLeft % scanerTime == 0) {
+			others.clear();
+			sendToServer("SCAN");
+			expectOK();
+			int n = nextInt();
+			for (int i = 0; i < n; i++) {
+				int x = nextInt();
+				int y = nextInt();
+				others.add(new Point(x, y));
+			}
+		}
+	}
+
 	static void scan() {
 		turnsLeft();
+		getOthers();
 	}
 
 	static void getSatelites() {
@@ -311,12 +328,15 @@ public class Strategy {
 					}
 				}
 				if (bestP != null) {
+					Connections.roundInfo.println("best score " + bestDist);
 					dest = new Point(bestP.x, bestP.y);
 					bestP.used = true;
 				}
 			}
-			destinations.put(s.id, dest);
-			moveSatellite(s, dest.x, dest.y);
+			if (dest != null) {
+				destinations.put(s.id, dest);
+				moveSatellite(s, dest.x, dest.y);
+			}
 		}
 	}
 

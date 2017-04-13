@@ -306,6 +306,9 @@ public class Main extends JFrame {
 			}
 			drawCircle(Strategy.mother.x, Strategy.mother.y, 5,
 					Color.RED.getRGB());
+			for (Point p : Strategy.others) {
+				drawCircle(p.x, p.y, 1, Color.BLACK.getRGB());
+			}
 			BufferedImage pixelImage = new BufferedImage(width, height,
 					BufferedImage.TYPE_INT_RGB);
 			pixelImage.setRGB(0, 0, width, height, pixels, 0, width);
@@ -330,8 +333,9 @@ public class Main extends JFrame {
 							+ "/" + Strategy.allPacketsIds.size() + ", tasks "
 							+ Strategy.tasksDone + "/" + Strategy.tasksTotal
 							+ ", satellites = " + Strategy.satelites.size()
-							+ ", turns left = " + Strategy.turnsLeft + "\n satellite cost = " + Strategy.sateliteCost, 100, 100,
-					false);
+							+ ", turns left = " + Strategy.turnsLeft
+							+ "\n satellite cost = " + Strategy.sateliteCost,
+					100, 100, false);
 		}
 	}
 }
